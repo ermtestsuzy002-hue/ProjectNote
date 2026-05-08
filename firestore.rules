@@ -1,0 +1,212 @@
+// =====================================================================
+// Project Note — Firestore Security Rules
+// ---------------------------------------------------------------------
+// Deploy with:
+//   firebase deploy --only firestore:rules
+// Or copy/paste the contents below into the Firebase Console
+// (Firestore Database → Rules tab → Publish).
+// =====================================================================
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------- helpers -----------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // The current user's /users/{uid} doc (if it exists)
+    function me() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function meExists() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isOwner() {
+      return meExists() && me().role == 'owner';
+    }
+
+    function isEditorOrOwner() {
+      return meExists() && (me().role == 'owner' || me().role == 'editor');
+    }
+
+    function isNotDisabled() {
+      return meExists() && me().get('disabled', false) == false;
+    }
+
+    function isActive() {
+      return isSignedIn() && meExists() && isNotDisabled();
+    }
+
+    // Project access helpers
+    function project(pid) {
+      return get(/databases/$(database)/documents/projects/$(pid)).data;
+    }
+
+    function isProjectOwner(pid) {
+      return exists(/databases/$(database)/documents/projects/$(pid))
+        && project(pid).ownerId == request.auth.uid;
+    }
+
+    // Returns true when the signed-in user has a /shares doc for the project
+    function hasShare(pid) {
+      // /shares/{shareId} docs use shareId == projectId + "_" + targetUid
+      return exists(/databases/$(database)/documents/shares/$(pid + "_" + request.auth.uid));
+    }
+
+    function sharePerm(pid) {
+      return get(/databases/$(database)/documents/shares/$(pid + "_" + request.auth.uid)).data.permission;
+    }
+
+    function canViewProject(pid) {
+      return isOwner()
+        || isProjectOwner(pid)
+        || hasShare(pid);
+    }
+
+    function canEditProject(pid) {
+      return isOwner()
+        || isProjectOwner(pid)
+        || (hasShare(pid) && sharePerm(pid) == 'edit');
+    }
+
+    // ------------------------- /usernames -------------------------
+    // Public read so the registration form can check if a username is taken.
+    // A user can claim a username only if the doc.uid matches their own uid.
+    match /usernames/{username} {
+      allow read: if true;
+      allow create: if isSignedIn()
+                    && request.resource.data.uid == request.auth.uid;
+      allow update: if isOwner()
+                    || (isSignedIn()
+                        && resource.data.uid == request.auth.uid
+                        && request.resource.data.uid == request.auth.uid);
+      allow delete: if isOwner()
+                    || (isSignedIn() && resource.data.uid == request.auth.uid);
+    }
+
+    // ------------------------- /users -----------------------------
+    // - Anyone signed-in can read the user index (needed for share/assignee
+    //   lookups, role display in cards, etc.).
+    // - A user can update their OWN profile (favorites, recent, lastLoginAt)
+    //   but cannot escalate their role or unset `disabled`.
+    // - Only owners can change role/disabled or delete a user.
+    match /users/{uid} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+                    && request.auth.uid == uid
+                    && request.resource.data.role in ['editor', 'viewer']
+                    && request.resource.data.get('disabled', false) == false;
+
+      // Self-update: can change favorites/recent/etc but NOT role or disabled
+      allow update: if (isOwner())
+                    || (isSignedIn()
+                        && request.auth.uid == uid
+                        && request.resource.data.role == resource.data.role
+                        && request.resource.data.get('disabled', false)
+                           == resource.data.get('disabled', false));
+
+      allow delete: if isOwner();
+    }
+
+    // ------------------------- /projects --------------------------
+    match /projects/{pid} {
+      allow read: if isActive() && (
+        isOwner()
+        || resource.data.ownerId == request.auth.uid
+        || hasShare(pid)
+      );
+
+      allow create: if isActive()
+                    && isEditorOrOwner()
+                    && request.resource.data.ownerId == request.auth.uid;
+
+      allow update: if isActive() && (
+        isOwner()
+        || resource.data.ownerId == request.auth.uid
+        || (hasShare(pid) && sharePerm(pid) == 'edit')
+      );
+
+      allow delete: if isActive() && (
+        isOwner() || resource.data.ownerId == request.auth.uid
+      );
+    }
+
+    // ------------------------- /groups ----------------------------
+    // Group docs carry projectId for fast access checks.
+    match /groups/{gid} {
+      allow read:   if isActive() && canViewProject(resource.data.projectId);
+      allow create: if isActive()
+                    && canEditProject(request.resource.data.projectId);
+      allow update: if isActive()
+                    && canEditProject(resource.data.projectId)
+                    && canEditProject(request.resource.data.projectId);
+      allow delete: if isActive() && canEditProject(resource.data.projectId);
+    }
+
+    // ------------------------- /notes -----------------------------
+    match /notes/{nid} {
+      allow read:   if isActive() && canViewProject(resource.data.projectId);
+      allow create: if isActive()
+                    && canEditProject(request.resource.data.projectId);
+      allow update: if isActive()
+                    && canEditProject(resource.data.projectId)
+                    && canEditProject(request.resource.data.projectId);
+      allow delete: if isActive() && canEditProject(resource.data.projectId);
+    }
+
+    // ------------------------- /shares ----------------------------
+    // - Project owner (or system owner) manages shares for their project.
+    // - The targeted user can read their own share doc.
+    match /shares/{sid} {
+      allow read: if isActive() && (
+        isOwner()
+        || resource.data.targetUid == request.auth.uid
+        || isProjectOwner(resource.data.projectId)
+      );
+
+      allow create: if isActive()
+                    && (isOwner()
+                        || isProjectOwner(request.resource.data.projectId));
+
+      allow update: if isActive()
+                    && (isOwner()
+                        || isProjectOwner(resource.data.projectId));
+
+      allow delete: if isActive()
+                    && (isOwner()
+                        || isProjectOwner(resource.data.projectId));
+    }
+
+    // ------------------------- /activity --------------------------
+    // - Any active user may append an activity entry as themselves.
+    // - Owners can read everything; regular users see entries for projects
+    //   they can view (rule-side `canViewProject` keeps reads consistent
+    //   with project access).
+    match /activity/{aid} {
+      allow read: if isActive() && (
+        isOwner()
+        || (resource.data.get('projectId', '') == ''
+            ? resource.data.actorUid == request.auth.uid
+            : canViewProject(resource.data.projectId))
+      );
+
+      allow create: if isActive()
+                    && request.resource.data.actorUid == request.auth.uid;
+
+      allow update: if false;
+      allow delete: if isOwner();
+    }
+
+    // ------------------------- default deny -----------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

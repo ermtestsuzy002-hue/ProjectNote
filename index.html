@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Project Note</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="css/style.css" rel="stylesheet" />
+</head>
+<body class="pn-app-body">
+
+<!-- =============================================================
+     Top Navbar
+============================================================== -->
+<nav class="pn-navbar">
+    <div class="d-flex align-items-center gap-3">
+        <button class="btn btn-sm btn-icon d-lg-none" id="sidebarToggleBtn" type="button">
+            <i class="bi bi-list"></i>
+        </button>
+        <a href="#" class="pn-logo">
+            <span class="pn-logo-mark"><i class="bi bi-stickies-fill"></i></span>
+            <span class="pn-logo-text d-none d-sm-inline">Project<span>Note</span></span>
+        </a>
+    </div>
+
+    <div class="pn-search d-none d-md-block">
+        <i class="bi bi-search"></i>
+        <input type="search" id="globalSearch" class="form-control"
+               placeholder="Search projects, notes, people..." />
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-icon" id="themeToggleBtn" type="button" onclick="PN_toggleTheme()" title="Toggle theme">
+            <i class="bi bi-moon-stars-fill"></i>
+        </button>
+        <div class="pn-user-menu dropdown">
+            <button class="btn pn-user-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                <span class="pn-avatar pn-avatar-sm" id="navAvatar">??</span>
+                <span class="d-none d-md-flex flex-column align-items-start">
+                    <span class="pn-user-name" id="navUserName">User</span>
+                    <span class="pn-user-role" id="navUserRole">role</span>
+                </span>
+                <i class="bi bi-chevron-down d-none d-md-inline"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end pn-dropdown">
+                <li class="dropdown-header" id="navUserHeader">Signed in</li>
+                <li><a class="dropdown-item" href="#" data-pn-view="dashboard"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+                <li class="d-md-none"><a class="dropdown-item" href="#" id="mobileSearchBtn"><i class="bi bi-search me-2"></i>Search</a></li>
+                <li><hr class="dropdown-divider" /></li>
+                <li><a class="dropdown-item text-danger" href="#" id="logoutBtn"><i class="bi bi-box-arrow-right me-2"></i>Sign out</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<!-- =============================================================
+     Sidebar + Main viewport
+============================================================== -->
+<div class="pn-shell">
+
+    <aside class="pn-sidebar" id="appSidebar">
+        <div class="pn-sidebar-section">
+            <button class="btn btn-primary w-100 pn-create-btn" id="newProjectBtn">
+                <i class="bi bi-plus-lg me-2"></i>New Project
+            </button>
+        </div>
+
+        <div class="pn-sidebar-section">
+            <div class="pn-sidebar-label">Workspace</div>
+            <ul class="pn-side-menu">
+                <li><a href="#" class="active" data-pn-view="dashboard"><i class="bi bi-speedometer2"></i>Dashboard</a></li>
+                <li><a href="#" data-pn-filter="my"><i class="bi bi-folder2-open"></i>My Projects</a></li>
+                <li><a href="#" data-pn-filter="shared"><i class="bi bi-people"></i>Shared with me</a></li>
+                <li><a href="#" data-pn-filter="favorites"><i class="bi bi-star"></i>Favorites</a></li>
+                <li><a href="#" data-pn-filter="archived"><i class="bi bi-archive"></i>Archived</a></li>
+            </ul>
+        </div>
+
+        <div class="pn-sidebar-section pn-recent" id="recentSection">
+            <div class="pn-sidebar-label">Recently viewed</div>
+            <ul class="pn-side-menu" id="recentList">
+                <li class="pn-side-empty">No recent projects</li>
+            </ul>
+        </div>
+
+        <div class="pn-sidebar-section pn-owner-only d-none" id="ownerSection">
+            <div class="pn-sidebar-label">Administration</div>
+            <ul class="pn-side-menu">
+                <li><a href="#" data-pn-view="users"><i class="bi bi-people-fill"></i>User Management</a></li>
+                <li><a href="#" data-pn-view="activity"><i class="bi bi-activity"></i>Activity Log</a></li>
+            </ul>
+        </div>
+    </aside>
+
+    <!-- =========================================================
+         Main content area
+    ========================================================== -->
+    <main class="pn-main" id="appMain">
+        <!-- Filled dynamically by app.js -->
+        <div class="pn-loading-page">
+            <div class="spinner-border text-primary"></div>
+            <p class="mt-3 text-muted">Loading workspace…</p>
+        </div>
+    </main>
+</div>
+
+<!-- =============================================================
+     Templates (cloned by JS)
+============================================================== -->
+<template id="tpl-dashboard">
+    <div class="pn-page">
+        <header class="pn-page-head">
+            <div>
+                <h1 class="pn-page-title">Dashboard</h1>
+                <p class="pn-page-subtitle">All projects you can access.</p>
+            </div>
+            <div class="pn-page-actions">
+                <div class="btn-group" role="group">
+                    <button class="btn btn-outline-secondary" data-pn-filter-btn="all">All</button>
+                    <button class="btn btn-outline-secondary" data-pn-filter-btn="my">Mine</button>
+                    <button class="btn btn-outline-secondary" data-pn-filter-btn="shared">Shared</button>
+                    <button class="btn btn-outline-secondary" data-pn-filter-btn="favorites">Starred</button>
+                    <button class="btn btn-outline-secondary" data-pn-filter-btn="archived">Archived</button>
+                </div>
+                <button class="btn btn-primary ms-2" id="dashNewBtn">
+                    <i class="bi bi-plus-lg me-1"></i>New
+                </button>
+            </div>
+        </header>
+        <div class="pn-project-grid" id="projectGrid"></div>
+    </div>
+</template>
+
+<template id="tpl-project">
+    <div class="pn-page pn-page-project">
+        <header class="pn-project-head">
+            <div class="pn-project-head-main">
+                <button class="btn btn-icon me-2" data-pn-back>
+                    <i class="bi bi-arrow-left"></i>
+                </button>
+                <div class="flex-grow-1">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <h1 class="pn-page-title mb-0" id="projTitle">Project</h1>
+                        <span class="pn-pill" id="projVisibility"></span>
+                        <span class="pn-pill pn-pill-perm" id="projPerm"></span>
+                        <button class="btn btn-icon" id="projStarBtn" title="Star">
+                            <i class="bi bi-star"></i>
+                        </button>
+                    </div>
+                    <p class="pn-page-subtitle mb-0" id="projDesc"></p>
+                </div>
+            </div>
+            <div class="pn-project-actions">
+                <div class="dropdown d-inline-block">
+                    <button class="btn btn-outline-secondary" data-bs-toggle="dropdown">
+                        <i class="bi bi-download me-1"></i>Export
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" data-pn-export="csv"><i class="bi bi-filetype-csv me-2"></i>CSV</a></li>
+                        <li><a class="dropdown-item" href="#" data-pn-export="json"><i class="bi bi-filetype-json me-2"></i>JSON</a></li>
+                        <li><a class="dropdown-item" href="#" data-pn-export="pdf"><i class="bi bi-filetype-pdf me-2"></i>PDF</a></li>
+                    </ul>
+                </div>
+                <button class="btn btn-outline-secondary" id="projShareBtn" data-pn-edit-only>
+                    <i class="bi bi-share me-1"></i>Share
+                </button>
+                <button class="btn btn-primary" id="projAddGroupBtn" data-pn-edit-only>
+                    <i class="bi bi-plus-lg me-1"></i>Add Group
+                </button>
+                <div class="dropdown d-inline-block">
+                    <button class="btn btn-icon" data-bs-toggle="dropdown">
+                        <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" data-pn-action="edit-project" data-pn-edit-only><i class="bi bi-pencil me-2"></i>Edit project</a></li>
+                        <li><a class="dropdown-item" href="#" data-pn-action="archive-project" data-pn-edit-only><i class="bi bi-archive me-2"></i>Archive / restore</a></li>
+                        <li><hr class="dropdown-divider" /></li>
+                        <li><a class="dropdown-item text-danger" href="#" data-pn-action="delete-project" data-pn-edit-only><i class="bi bi-trash me-2"></i>Delete project</a></li>
+                    </ul>
+                </div>
+            </div>
+        </header>
+
+        <div class="pn-project-toolbar">
+            <div class="pn-project-toolbar-left">
+                <div class="pn-search-inline">
+                    <i class="bi bi-search"></i>
+                    <input type="search" id="projSearch" placeholder="Filter notes..." />
+                </div>
+                <select class="form-select form-select-sm pn-status-filter" id="projStatusFilter">
+                    <option value="">All statuses</option>
+                    <option value="todo">To Do</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="review">Review</option>
+                    <option value="done">Done</option>
+                    <option value="blocked">Blocked</option>
+                </select>
+            </div>
+            <div class="pn-project-toolbar-right">
+                <span class="pn-selection-count d-none" id="selCount">0 selected</span>
+                <button class="btn btn-sm btn-outline-danger d-none" id="bulkDeleteBtn" data-pn-edit-only>
+                    <i class="bi bi-trash me-1"></i>Delete selected
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" id="bulkSelectToggle">
+                    <i class="bi bi-check2-square me-1"></i>Select
+                </button>
+            </div>
+        </div>
+
+        <div class="pn-kanban-scroll">
+            <div class="pn-kanban" id="kanbanBoard"></div>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-users">
+    <div class="pn-page">
+        <header class="pn-page-head">
+            <div>
+                <h1 class="pn-page-title">User Management</h1>
+                <p class="pn-page-subtitle">Owner-only. Promote, demote, disable, reset passwords.</p>
+            </div>
+        </header>
+        <div class="pn-card">
+            <div class="table-responsive">
+                <table class="table align-middle pn-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-activity">
+    <div class="pn-page">
+        <header class="pn-page-head">
+            <div>
+                <h1 class="pn-page-title">Activity Log</h1>
+                <p class="pn-page-subtitle">Most recent changes across the workspace.</p>
+            </div>
+        </header>
+        <div class="pn-card pn-activity-list" id="activityList"></div>
+    </div>
+</template>
+
+<!-- =============================================================
+     Modal: New / Edit project
+============================================================== -->
+<div class="modal fade" id="projectModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="projectForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="projectModalTitle">New Project</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="projectIdInput" />
+                    <div class="mb-3">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-control" id="projectNameInput" required maxlength="100" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description (optional)</label>
+                        <textarea class="form-control" id="projectDescInput" rows="3" maxlength="500"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label d-block">Visibility</label>
+                        <div class="btn-group" role="group">
+                            <input type="radio" class="btn-check" name="projVis" id="visPrivate" value="private" checked />
+                            <label class="btn btn-outline-secondary" for="visPrivate">
+                                <i class="bi bi-lock me-1"></i>Private
+                            </label>
+                            <input type="radio" class="btn-check" name="projVis" id="visShared" value="shared" />
+                            <label class="btn btn-outline-secondary" for="visShared">
+                                <i class="bi bi-people me-1"></i>Shared
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" type="submit">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- =============================================================
+     Modal: Group editor (create / rename)
+============================================================== -->
+<div class="modal fade" id="groupModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="groupForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="groupModalTitle">New Group</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="groupIdInput" />
+                    <div class="mb-3">
+                        <label class="form-label">Group title</label>
+                        <input type="text" class="form-control" id="groupTitleInput" required maxlength="80" />
+                    </div>
+                    <div>
+                        <label class="form-label d-block">Color</label>
+                        <div class="pn-color-picker" id="groupColorPicker"></div>
+                        <input type="hidden" id="groupColorInput" value="#6366f1" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" type="submit">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- =============================================================
+     Modal: Note editor
+============================================================== -->
+<div class="modal fade" id="noteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form id="noteForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="noteModalTitle">New Note</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="noteIdInput" />
+                    <input type="hidden" id="noteGroupIdInput" />
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Title</label>
+                            <input type="text" class="form-control" id="noteTitleInput" required maxlength="200" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" id="noteDescInput" rows="5" maxlength="4000"></textarea>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" id="noteStatusInput">
+                                <option value="todo">To Do</option>
+                                <option value="in-progress">In Progress</option>
+                                <option value="review">Review</option>
+                                <option value="done">Done</option>
+                                <option value="blocked">Blocked</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Assignee (username)</label>
+                            <input type="text" class="form-control" id="noteAssigneeInput" placeholder="optional" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Due date</label>
+                            <input type="datetime-local" class="form-control" id="noteDueInput" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Tags</label>
+                            <input type="text" class="form-control" id="noteTagsInput" placeholder="comma separated, e.g. urgent, frontend" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">External link (optional)</label>
+                            <input type="url" class="form-control" id="noteLinkInput" placeholder="https://..." />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Attachments</label>
+                            <input type="file" class="form-control" id="noteFileInput" multiple
+                                   accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.csv" />
+                            <div class="form-text">Images, videos, PDFs, documents, archives. Max 50 MB per file.</div>
+                            <div class="pn-attach-list mt-2" id="noteAttachList"></div>
+                            <div class="pn-upload-progress d-none" id="noteUploadProgress">
+                                <div class="progress" style="height:6px;">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                         style="width:0%"></div>
+                                </div>
+                                <small class="text-muted" id="noteUploadLabel">Uploading...</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer justify-content-between">
+                    <button class="btn btn-outline-danger d-none" type="button" id="noteDeleteBtn">
+                        <i class="bi bi-trash me-1"></i>Delete
+                    </button>
+                    <div class="ms-auto d-flex gap-2">
+                        <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+                        <button class="btn btn-primary" type="submit">Save Note</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- =============================================================
+     Modal: Share project
+============================================================== -->
+<div class="modal fade" id="shareModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Share Project</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="shareForm" class="row g-2">
+                    <div class="col-md-6">
+                        <input type="text" class="form-control" id="shareUsernameInput"
+                               placeholder="Username" required />
+                    </div>
+                    <div class="col-md-4">
+                        <select class="form-select" id="sharePermInput">
+                            <option value="view">View only</option>
+                            <option value="edit">Allow edit</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-primary w-100" type="submit">Share</button>
+                    </div>
+                </form>
+                <hr />
+                <h6 class="mb-2">People with access</h6>
+                <ul class="list-group list-group-flush" id="shareList"></ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- =============================================================
+     Modal: Image / video viewer
+============================================================== -->
+<div class="modal fade" id="mediaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-0">
+                <h6 class="modal-title text-light" id="mediaModalTitle"></h6>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center" id="mediaModalBody"></div>
+        </div>
+    </div>
+</div>
+
+<!-- =============================================================
+     Scripts
+============================================================== -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+
+<script src="js/firebase.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/project.js"></script>
+<script src="js/note.js"></script>
+<script src="js/kanban.js"></script>
+<script src="js/share.js"></script>
+<script src="js/export.js"></script>
+<script src="js/users.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

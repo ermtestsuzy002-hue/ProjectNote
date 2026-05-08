@@ -1,0 +1,89 @@
+// =====================================================================
+// Project Note — Firebase Storage Security Rules
+// ---------------------------------------------------------------------
+// Deploy with:
+//   firebase deploy --only storage
+// Or copy/paste into the Firebase Console
+// (Storage → Rules tab → Publish).
+// ---------------------------------------------------------------------
+// Storage layout used by the app:
+//
+//   /projects/{projectId}/{timestamp}_{uid}_{filename}
+//
+// Authorization is enforced by looking up the parent project / share docs
+// in Firestore (firestore.exists / firestore.get).
+// =====================================================================
+
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ------------------------- helpers -----------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function meDoc() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isOwner() {
+      return isSignedIn()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && meDoc().role == 'owner';
+    }
+
+    function isActive() {
+      return isSignedIn()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && meDoc().get('disabled', false) == false;
+    }
+
+    function isProjectOwner(pid) {
+      return firestore.exists(/databases/(default)/documents/projects/$(pid))
+        && firestore.get(/databases/(default)/documents/projects/$(pid)).data.ownerId
+           == request.auth.uid;
+    }
+
+    function hasShare(pid) {
+      return firestore.exists(/databases/(default)/documents/shares/$(pid + "_" + request.auth.uid));
+    }
+
+    function sharePerm(pid) {
+      return firestore.get(/databases/(default)/documents/shares/$(pid + "_" + request.auth.uid)).data.permission;
+    }
+
+    function canView(pid) {
+      return isOwner() || isProjectOwner(pid) || hasShare(pid);
+    }
+
+    function canEdit(pid) {
+      return isOwner()
+        || isProjectOwner(pid)
+        || (hasShare(pid) && sharePerm(pid) == 'edit');
+    }
+
+    // ------------------------- project files -----------------------
+    match /projects/{projectId}/{file=**} {
+      // Anyone with view-or-better access may download attachments.
+      allow read: if isActive() && canView(projectId);
+
+      // Edit-or-better is required to upload/replace; size capped at 50 MB.
+      allow write: if isActive()
+                   && canEdit(projectId)
+                   && request.resource.size < 50 * 1024 * 1024;
+
+      // Edit-or-better may delete; project owner / system owner always can.
+      allow delete: if isActive()
+                    && (isOwner()
+                        || isProjectOwner(projectId)
+                        || (hasShare(projectId) && sharePerm(projectId) == 'edit'));
+    }
+
+    // ------------------------- default deny ------------------------
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
